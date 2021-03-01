@@ -3,6 +3,7 @@ import java.io.FileReader;
 import java.io.IOException;
 import java.lang.reflect.Array;
 import java.util.Arrays;
+import java.util.Comparator;
 
 public class Banker {
 	private int numberOfCustomers;	// the number of customers
@@ -20,13 +21,15 @@ public class Banker {
 	 */
 	public Banker (int[] resources, int numberOfCustomers) {
 		// TODO: set the number of resources
-
+		this.numberOfResources = resources.length;
 		// TODO: set the number of customers
-
+		this.numberOfCustomers = numberOfCustomers;
 		// TODO: set the value of bank resources to available
-
+		this.available = resources.clone();
 		// TODO: set the array size for maximum, allocation, and need
-
+		this.maximum = new int[this.numberOfResources][this.numberOfCustomers];
+		this.allocation = new int[this.numberOfResources][this.numberOfCustomers];
+		this.need = new int[this.numberOfCustomers][this.numberOfResources];
 	}
 
 	/**
@@ -36,7 +39,8 @@ public class Banker {
 	 */
 	public void setMaximumDemand(int customerIndex, int[] maximumDemand) {
 		// TODO: add customer, update maximum and need
-
+		this.maximum[customerIndex] = maximumDemand;
+		this.need[customerIndex] = maximumDemand;
 	}
 
 	/**
@@ -76,19 +80,52 @@ public class Banker {
 	 * @param request        An array of the requested count for each resource.
 	 * @return true if the requested resources can be loaned, else false.
 	 */
-	public synchronized boolean requestResources(int customerIndex, int[] request) {
+	public synchronized boolean requestResources(int customerIndex, int[] request) throws IllegalArgumentException{
 		// TODO: print the request
 		System.out.println("Customer " + customerIndex + " requesting");
         System.out.println(Arrays.toString(request));
 		// TODO: check if request larger than need
-		
+		if (!compare(this.need[customerIndex], request)){
+			throw new IllegalArgumentException();
+		}
 		// TODO: check if request larger than available
-		
+		if (!compare(this.available, request)){
+			return false;
+		}
 		// TODO: check if the state is safe or not
-		
+		boolean state = checkSafe(customerIndex, request);
 		// TODO: if it is safe, allocate the resources to customer customerNumber
-		
+		if (state){
+			minus(this.available, request);
+			minus(this.need[customerIndex], request);
+			plus(this.allocation[customerIndex], request);
+			return true;
+		}
+		return false;
+	}
+
+	//If every element in a1 is larger or equal than a2, return true; otherwise, return false.
+	public boolean compare(int[] a1, int[] a2){
+		for (int i=0;i<a1.length;i++){
+			if (a1[i]<a2[i]){
+				return false;
+			}
+		}
 		return true;
+	}
+
+	//For every element a1[i], replace it by a1[i]-a2[i]
+	public void minus(int[] a1, int[] a2){
+		for (int i=0;i<a1.length;i++){
+			a1[i] = a1[i]-a2[i];
+		}
+	}
+
+	//For every element a1[i], replace it by a1[i]+a2[i]
+	public void plus(int[] a1, int[] a2){
+		for (int i=0;i<a1.length;i++){
+			a1[i] = a1[i]+a2[i];
+		}
 	}
 
 	/**
@@ -100,10 +137,10 @@ public class Banker {
 		// TODO: print the release
 		System.out.println("Customer " + customerIndex + " releasing");
 		System.out.println(Arrays.toString(release));
-		
 		// TODO: release the resources from customer customerNumber
-		
-
+		plus(this.available, release);
+		plus(this.need[customerIndex], release);
+		minus(this.allocation[customerIndex], release);
 	}
 
 	/**
@@ -115,7 +152,45 @@ public class Banker {
 	 */
 	private synchronized boolean checkSafe(int customerIndex, int[] request) {
 		// TODO: check if the state is safe
-		
+		// Initialize
+		int[] available = this.available.clone();
+		minus(available, request);
+
+		int[][] need = this.need.clone();
+		for (int i=0;i<need.length;i++){
+			need[i]=this.need[i].clone();
+			minus(need[i],request);
+		}
+
+		int[][] allocation = this.allocation.clone();
+		for (int i=0;i<allocation.length;i++){
+			allocation[i]=this.allocation[i].clone();
+			minus(allocation[i],request);
+		}
+
+		boolean[] finish = new boolean[this.numberOfCustomers];
+
+		// Find available index i
+		int i = 0;
+		while(true){
+			if(i>=numberOfCustomers){
+				break;
+			}
+			if (finish[i]==false&&compare(available, need[customerIndex])){
+				plus(available, allocation[i]);
+				finish[i]=true;
+				i = 0;
+			}else{
+				i++;
+			};
+		}
+
+		// Check finish[]
+		for(boolean pass:finish){
+			if(!pass){
+				return false;
+			}
+		}
 		return true;
 	}
 
